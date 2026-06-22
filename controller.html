@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>遙控車控制器</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            background: #1a1a2e;
+            color: white;
+            font-family: Arial, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            gap: 30px;
+            user-select: none;
+        }
+
+        h1 { font-size: 1.4rem; letter-spacing: 2px; opacity: 0.8; }
+
+        #status {
+            font-size: 0.9rem;
+            padding: 6px 16px;
+            border-radius: 20px;
+            background: #333;
+        }
+        #status.connected { background: #1b5e20; }
+        #status.disconnected { background: #b71c1c; }
+
+        #connect-btn {
+            padding: 12px 32px;
+            font-size: 1rem;
+            background: #0f3460;
+            color: white;
+            border: 2px solid #e94560;
+            border-radius: 8px;
+            cursor: pointer;
+        }
+        #connect-btn:active { opacity: 0.7; }
+
+        .dpad {
+            display: grid;
+            grid-template-areas:
+                ". up ."
+                "left stop right"
+                ". down .";
+            gap: 10px;
+        }
+
+        .btn {
+            width: 80px;
+            height: 80px;
+            border-radius: 12px;
+            border: none;
+            font-size: 1.8rem;
+            cursor: pointer;
+            background: #0f3460;
+            color: white;
+            border: 2px solid #e94560;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: background 0.1s;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        .btn:active, .btn.pressing {
+            background: #e94560;
+        }
+
+        .btn[data-dir="F"] { grid-area: up; }
+        .btn[data-dir="B"] { grid-area: down; }
+        .btn[data-dir="L"] { grid-area: left; }
+        .btn[data-dir="R"] { grid-area: right; }
+        .btn[data-dir="S"] { grid-area: stop; font-size: 1rem; }
+
+        #hint {
+            font-size: 0.75rem;
+            opacity: 0.5;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+
+    <h1>🚗 遙控車控制器</h1>
+
+    <div id="status" class="disconnected">未連線</div>
+
+    <button id="connect-btn">連接藍牙 (BT-05)</button>
+
+    <div class="dpad">
+        <button class="btn" data-dir="F">▲</button>
+        <button class="btn" data-dir="L">◀</button>
+        <button class="btn" data-dir="S">停</button>
+        <button class="btn" data-dir="R">▶</button>
+        <button class="btn" data-dir="B">▼</button>
+    </div>
+
+    <div id="hint">按住方向鍵持續移動，放開自動停止<br>需使用 Chrome 瀏覽器</div>
+
+    <script>
+        const SERVICE_UUID  = '0000ffe0-0000-1000-8000-00805f9b34fb';
+        const CHAR_UUID     = '0000ffe1-0000-1000-8000-00805f9b34fb';
+
+        let characteristic = null;
+        const statusEl = document.getElementById('status');
+        const connectBtn = document.getElementById('connect-btn');
+
+        connectBtn.addEventListener('click', async () => {
+            try {
+                const device = await navigator.bluetooth.requestDevice({
+                    filters: [{ namePrefix: 'BT' }],
+                    optionalServices: [SERVICE_UUID]
+                });
+
+                statusEl.textContent = '連線中...';
+                statusEl.className = '';
+
+                const server = await device.gatt.connect();
+                const service = await server.getPrimaryService(SERVICE_UUID);
+                characteristic = await service.getCharacteristic(CHAR_UUID);
+
+                statusEl.textContent = '已連線：' + device.name;
+                statusEl.className = 'connected';
+                connectBtn.style.display = 'none';
+
+                device.addEventListener('gattserverdisconnected', () => {
+                    characteristic = null;
+                    statusEl.textContent = '連線中斷';
+                    statusEl.className = 'disconnected';
+                    connectBtn.style.display = 'block';
+                });
+
+            } catch (err) {
+                statusEl.textContent = '連線失敗：' + err.message;
+                statusEl.className = 'disconnected';
+            }
+        });
+
+        async function send(cmd) {
+            if (!characteristic) return;
+            try {
+                await characteristic.writeValue(new TextEncoder().encode(cmd));
+            } catch (e) {}
+        }
+
+        document.querySelectorAll('.btn').forEach(btn => {
+            const dir = btn.dataset.dir;
+            const isStop = dir === 'S';
+
+            const press = () => {
+                btn.classList.add('pressing');
+                send(dir);
+            };
+
+            const release = () => {
+                btn.classList.remove('pressing');
+                if (!isStop) send('S');
+            };
+
+            btn.addEventListener('mousedown', press);
+            btn.addEventListener('mouseup', release);
+            btn.addEventListener('mouseleave', release);
+            btn.addEventListener('touchstart', e => { e.preventDefault(); press(); }, { passive: false });
+            btn.addEventListener('touchend', e => { e.preventDefault(); release(); }, { passive: false });
+        });
+    </script>
+</body>
+</html>
