@@ -46,7 +46,7 @@
             display: grid;
             grid-template-areas:
                 ". up ."
-                "left stop right"
+                "left . right"
                 ". down .";
             gap: 10px;
         }
@@ -68,15 +68,12 @@
             -webkit-tap-highlight-color: transparent;
         }
 
-        .btn:active, .btn.pressing {
-            background: #e94560;
-        }
+        .btn:active, .btn.pressing { background: #e94560; }
 
         .btn[data-dir="F"] { grid-area: up; }
         .btn[data-dir="B"] { grid-area: down; }
         .btn[data-dir="L"] { grid-area: left; }
         .btn[data-dir="R"] { grid-area: right; }
-        .btn[data-dir="S"] { grid-area: stop; font-size: 1rem; }
 
         #hint {
             font-size: 0.75rem;
@@ -96,7 +93,6 @@
     <div class="dpad">
         <button class="btn" data-dir="F">▲</button>
         <button class="btn" data-dir="L">◀</button>
-        <button class="btn" data-dir="S">停</button>
         <button class="btn" data-dir="R">▶</button>
         <button class="btn" data-dir="B">▼</button>
     </div>
@@ -104,11 +100,11 @@
     <div id="hint">按住方向鍵持續移動，放開自動停止<br>需使用 Chrome 瀏覽器</div>
 
     <script>
-        const SERVICE_UUID  = '0000ffe0-0000-1000-8000-00805f9b34fb';
-        const CHAR_UUID     = '0000ffe1-0000-1000-8000-00805f9b34fb';
+        const SERVICE_UUID = '0000ffe0-0000-1000-8000-00805f9b34fb';
+        const CHAR_UUID    = '0000ffe1-0000-1000-8000-00805f9b34fb';
 
         let characteristic = null;
-        const statusEl = document.getElementById('status');
+        const statusEl  = document.getElementById('status');
         const connectBtn = document.getElementById('connect-btn');
 
         connectBtn.addEventListener('click', async () => {
@@ -121,7 +117,7 @@
                 statusEl.textContent = '連線中...';
                 statusEl.className = '';
 
-                const server = await device.gatt.connect();
+                const server  = await device.gatt.connect();
                 const service = await server.getPrimaryService(SERVICE_UUID);
                 characteristic = await service.getCharacteristic(CHAR_UUID);
 
@@ -151,23 +147,15 @@
 
         document.querySelectorAll('.btn').forEach(btn => {
             const dir = btn.dataset.dir;
-            const isStop = dir === 'S';
 
-            const press = () => {
-                btn.classList.add('pressing');
-                send(dir);
-            };
+            const press   = () => { btn.classList.add('pressing');    send(dir); };
+            const release = () => { btn.classList.remove('pressing'); send('S'); };
 
-            const release = () => {
-                btn.classList.remove('pressing');
-                if (!isStop) send('S');
-            };
-
-            btn.addEventListener('mousedown', press);
-            btn.addEventListener('mouseup', release);
+            btn.addEventListener('mousedown',  press);
+            btn.addEventListener('mouseup',    release);
             btn.addEventListener('mouseleave', release);
-            btn.addEventListener('touchstart', e => { e.preventDefault(); press(); }, { passive: false });
-            btn.addEventListener('touchend', e => { e.preventDefault(); release(); }, { passive: false });
+            btn.addEventListener('touchstart', e => { e.preventDefault(); press(); },   { passive: false });
+            btn.addEventListener('touchend',   e => { e.preventDefault(); release(); }, { passive: false });
         });
     </script>
 </body>
